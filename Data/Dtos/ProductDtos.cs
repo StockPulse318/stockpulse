@@ -9,6 +9,10 @@ public sealed class ProductDto
     [JsonPropertyName("productID")]
     public int ProductId { get; set; }
 
+    public string ProductCode { get; set; } = string.Empty;
+
+    public int CategoryId { get; set; }
+
     [JsonPropertyName("productName")]
     public string ProductName { get; set; } = string.Empty;
 
@@ -50,6 +54,8 @@ public sealed class ProductDtoConverter : JsonConverter<ProductDto>
         var dto = new ProductDto
         {
             ProductId = GetInt(el, "productID", "productId", "product_id", "id", "ID", "Id"),
+            ProductCode = GetString(el, "productCode", "product_code") ?? string.Empty,
+            CategoryId = GetInt(el, "categoryId", "category_id"),
             ProductName = GetString(el, "productName", "name", "product_name", "title") ?? string.Empty,
             Category = ReadCategory(el),
             Quantity = GetInt(el, "quantity", "qty", "stock", "stockQuantity"),
@@ -65,6 +71,8 @@ public sealed class ProductDtoConverter : JsonConverter<ProductDto>
     {
         writer.WriteStartObject();
         writer.WriteNumber("productID", value.ProductId);
+        writer.WriteString("productCode", value.ProductCode);
+        writer.WriteNumber("categoryId", value.CategoryId);
         writer.WriteString("productName", value.ProductName);
         writer.WriteString("category", value.Category);
         writer.WriteNumber("quantity", value.Quantity);
@@ -224,35 +232,50 @@ public sealed class ProductDtoConverter : JsonConverter<ProductDto>
 
 public sealed class CreateProductRequestDto
 {
-    [JsonPropertyName("productName")]
-    public string ProductName { get; set; } = string.Empty;
+    [JsonPropertyName("product_code")]
+    public string ProductCode { get; set; } = string.Empty;
 
-    [JsonPropertyName("category")]
-    public string Category { get; set; } = string.Empty;
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("category_id")]
+    public int CategoryId { get; set; }
 
     [JsonPropertyName("quantity")]
     public int Quantity { get; set; }
 
-    [JsonPropertyName("unitPrice")]
+    [JsonPropertyName("unit_price")]
     public decimal UnitPrice { get; set; }
 
-    [JsonPropertyName("reorderLevel")]
+    [JsonPropertyName("reorder_level")]
     public int ReorderLevel { get; set; }
 }
 
 public sealed class UpdateProductRequestDto
 {
-    [JsonPropertyName("productName")]
-    public string ProductName { get; set; } = string.Empty;
+    [JsonPropertyName("product_code")]
+    public string ProductCode { get; set; } = string.Empty;
 
-    [JsonPropertyName("category")]
-    public string Category { get; set; } = string.Empty;
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
 
-    [JsonPropertyName("unitPrice")]
+    [JsonPropertyName("category_id")]
+    public int CategoryId { get; set; }
+
+    [JsonPropertyName("unit_price")]
     public decimal UnitPrice { get; set; }
 
-    [JsonPropertyName("reorderLevel")]
+    [JsonPropertyName("reorder_level")]
     public int ReorderLevel { get; set; }
+}
+
+public sealed class CategoryDto
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
 }
 
 public sealed class StockMovementRequestDto

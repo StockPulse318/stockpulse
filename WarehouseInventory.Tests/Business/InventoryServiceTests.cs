@@ -14,7 +14,7 @@ public class InventoryServiceTests
     {
         public List<ProductDto> Products { get; set; } = new();
         public List<ProductDto> LowStockProducts { get; set; } = new();
-        public List<string> Categories { get; set; } = new();
+        public List<CategoryDto> Categories { get; set; } = new();
         public bool ThrowUnauthorized { get; set; }
 
         public Task<LoginResponseDto> LoginAsync(string username, string password, CancellationToken cancellationToken = default) =>
@@ -89,8 +89,8 @@ public class InventoryServiceTests
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<string>> GetCategoriesAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<string>>(Categories);
+        public Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<CategoryDto>>(Categories);
     }
 
     [Fact]

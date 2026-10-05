@@ -18,6 +18,7 @@ public partial class MainWindow : Window
         {
             await _viewModel.InitializeAsync();
         };
+        Closed += (_, _) => _viewModel.Dispose();
     }
 
     private void InventoryGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)

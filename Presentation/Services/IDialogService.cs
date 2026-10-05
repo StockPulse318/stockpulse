@@ -9,7 +9,7 @@ public interface IDialogService
     void ShowError(string title, string message);
     bool ShowConfirmation(string title, string message);
     bool ShowStockDialog(Product product, bool isStockIn, out int quantity);
-    bool ShowProductDialog(Product? existingProduct, IReadOnlyList<string> categories, out Product result);
+    bool ShowProductDialog(Product? existingProduct, IReadOnlyList<Category> categories, out Product result);
     void ShowMainWindow();
     void ShowLoginWindow(string? message = null);
 }

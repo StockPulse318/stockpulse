@@ -15,7 +15,7 @@ public class MainViewModelTests
         public void ShowError(string title, string message) { }
         public bool ShowConfirmation(string title, string message) => true;
         public bool ShowStockDialog(Product product, bool isStockIn, out int quantity) { quantity = 5; return true; }
-        public bool ShowProductDialog(Product? existingProduct, IReadOnlyList<string> categories, out Product result) { result = new Product(); return true; }
+        public bool ShowProductDialog(Product? existingProduct, IReadOnlyList<Category> categories, out Product result) { result = new Product(); return true; }
         public void ShowMainWindow() { }
         public void ShowLoginWindow(string? message = null) { }
     }
@@ -43,8 +43,8 @@ public class MainViewModelTests
             Task.FromResult<IReadOnlyList<Product>>(Products.Where(p => p.Name.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList());
         public Task<IReadOnlyList<Product>> GetLowStockProductsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Product>>(LowStockProducts);
-        public Task<IReadOnlyList<string>> GetCategoriesAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<string>>(Products.Select(p => p.Category).Distinct().ToList());
+        public Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Category>>(Products.Select(p => new Category(p.CategoryId == 0 ? 1 : p.CategoryId, p.Category)).DistinctBy(c => c.Name).ToList());
         public Task<Product> AddProductAsync(Product product, CancellationToken cancellationToken = default) => Task.FromResult(product);
         public Task UpdateProductAsync(Product product, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task DeleteProductAsync(int productId, CancellationToken cancellationToken = default) => Task.CompletedTask;

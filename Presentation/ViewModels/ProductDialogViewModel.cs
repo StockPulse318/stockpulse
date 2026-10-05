@@ -17,10 +17,13 @@ public sealed partial class ProductDialogViewModel : ObservableObject
     [ObservableProperty]
     private string _name = string.Empty;
 
-    public ObservableCollection<string> Categories { get; } = new();
+    [ObservableProperty]
+    private string _productCode = string.Empty;
+
+    public ObservableCollection<Category> Categories { get; } = new();
 
     [ObservableProperty]
-    private string? _selectedCategory;
+    private Category? _selectedCategory;
 
     [ObservableProperty]
     private string _unitPriceText = "0.00";
@@ -41,13 +44,13 @@ public sealed partial class ProductDialogViewModel : ObservableObject
 
     public ProductDialogViewModel(
         Product? originalProduct,
-        IReadOnlyList<string> availableCategories,
+        IReadOnlyList<Category> availableCategories,
         IValidationService validationService)
     {
         _originalProduct = originalProduct;
         _validationService = validationService;
 
-        foreach (var cat in availableCategories.Where(c => !string.IsNullOrWhiteSpace(c)))
+        foreach (var cat in availableCategories.Where(c => c.Id > 0 && !string.IsNullOrWhiteSpace(c.Name)))
         {
             Categories.Add(cat);
         }
@@ -55,8 +58,9 @@ public sealed partial class ProductDialogViewModel : ObservableObject
         if (originalProduct != null)
         {
             Name = originalProduct.Name;
-            SelectedCategory = Categories.FirstOrDefault(c => string.Equals(c, originalProduct.Category, StringComparison.OrdinalIgnoreCase))
-                               ?? originalProduct.Category;
+            ProductCode = originalProduct.ProductCode;
+            SelectedCategory = Categories.FirstOrDefault(c => c.Id == originalProduct.CategoryId)
+                               ?? Categories.FirstOrDefault(c => string.Equals(c.Name, originalProduct.Category, StringComparison.OrdinalIgnoreCase));
             UnitPriceText = originalProduct.UnitPrice.ToString("F2");
             ReorderLevelText = originalProduct.ReorderLevel.ToString();
             QuantityText = originalProduct.Quantity.ToString();
@@ -78,7 +82,13 @@ public sealed partial class ProductDialogViewModel : ObservableObject
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(SelectedCategory))
+        if (string.IsNullOrWhiteSpace(ProductCode))
+        {
+            ErrorMessage = "Product Code is required.";
+            return;
+        }
+
+        if (SelectedCategory == null)
         {
             ErrorMessage = "Please select a Category from the list.";
             return;
@@ -112,13 +122,15 @@ public sealed partial class ProductDialogViewModel : ObservableObject
 
         try
         {
-            _validationService.ValidateProduct(Name, SelectedCategory, unitPrice, reorderLevel, quantity);
+            _validationService.ValidateProduct(Name, SelectedCategory.Name, unitPrice, reorderLevel, quantity);
 
             ResultProduct = new Product
             {
                 Id = _originalProduct?.Id ?? 0,
+                ProductCode = ProductCode.Trim(),
                 Name = Name.Trim(),
-                Category = SelectedCategory.Trim(),
+                CategoryId = SelectedCategory.Id,
+                Category = SelectedCategory.Name,
                 UnitPrice = unitPrice,
                 ReorderLevel = reorderLevel,
                 Quantity = quantity,

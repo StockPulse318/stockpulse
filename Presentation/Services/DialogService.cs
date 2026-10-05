@@ -89,7 +89,7 @@ public sealed class DialogService : IDialogService
         return confirmed;
     }
 
-    public bool ShowProductDialog(Product? existingProduct, IReadOnlyList<string> categories, out Product result)
+    public bool ShowProductDialog(Product? existingProduct, IReadOnlyList<Category> categories, out Product result)
     {
         Product? resultProduct = null;
         bool confirmed = App.Current?.Dispatcher?.Invoke(() =>

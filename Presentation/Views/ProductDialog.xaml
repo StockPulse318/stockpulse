@@ -41,13 +41,18 @@
             <TextBox x:Name="NameInput" Style="{StaticResource FormInput}"
                      Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" TabIndex="1"/>
 
+            <TextBlock Text="Product Code" Style="{StaticResource FieldLabel}"/>
+            <TextBox Style="{StaticResource FormInput}"
+                     Text="{Binding ProductCode, UpdateSourceTrigger=PropertyChanged}" TabIndex="2"/>
+
             <!-- Category (Dropdown fed by endpoint, never typed freely) -->
             <TextBlock Text="Category" Style="{StaticResource FieldLabel}"/>
             <ComboBox Style="{StaticResource FormInput}"
                       ItemsSource="{Binding Categories}"
                       SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                      DisplayMemberPath="Name"
                       IsEditable="False"
-                      TabIndex="2"/>
+                      TabIndex="3"/>
 
             <!-- Price and Reorder Level in 2 columns -->
             <Grid Margin="0,4,0,0">

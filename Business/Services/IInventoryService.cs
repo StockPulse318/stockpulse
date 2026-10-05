@@ -7,7 +7,7 @@ public interface IInventoryService
     Task<IReadOnlyList<Product>> GetAllProductsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Product>> SearchProductsAsync(string query, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Product>> GetLowStockProductsAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<string>> GetCategoriesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken cancellationToken = default);
     Task<Product> AddProductAsync(Product product, CancellationToken cancellationToken = default);
     Task UpdateProductAsync(Product product, CancellationToken cancellationToken = default);
     Task DeleteProductAsync(int productId, CancellationToken cancellationToken = default);

@@ -48,23 +48,28 @@ public sealed class InventoryService : IInventoryService
         });
     }
 
-    public async Task<IReadOnlyList<string>> GetCategoriesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
         return await ExecuteWithAuthHandlingAsync(async () =>
         {
             var categories = await _apiClient.GetCategoriesAsync(cancellationToken);
             if (categories.Count > 0)
             {
-                return categories.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().OrderBy(c => c).ToList();
+                return categories
+                    .Where(c => c.Id > 0 && !string.IsNullOrWhiteSpace(c.Name))
+                    .Select(c => new Category(c.Id, c.Name.Trim()))
+                    .DistinctBy(c => c.Id)
+                    .OrderBy(c => c.Name)
+                    .ToList();
             }
 
             // Fallback: derive distinct categories from the full product catalog
             var allProducts = await _apiClient.GetProductsAsync(cancellationToken);
             return allProducts
-                .Select(p => CleanCategory(p.Category))
-                .Where(c => !string.IsNullOrWhiteSpace(c))
-                .Distinct()
-                .OrderBy(c => c)
+                .Where(p => p.CategoryId > 0 && !string.IsNullOrWhiteSpace(p.Category))
+                .Select(p => new Category(p.CategoryId, p.Category.Trim()))
+                .DistinctBy(c => c.Id)
+                .OrderBy(c => c.Name)
                 .ToList();
         });
     }
@@ -78,8 +83,9 @@ public sealed class InventoryService : IInventoryService
         {
             var request = new CreateProductRequestDto
             {
-                ProductName = product.Name.Trim(),
-                Category = product.Category.Trim(),
+                ProductCode = product.ProductCode.Trim(),
+                Name = product.Name.Trim(),
+                CategoryId = product.CategoryId,
                 Quantity = product.Quantity,
                 UnitPrice = product.UnitPrice,
                 ReorderLevel = product.ReorderLevel
@@ -99,8 +105,9 @@ public sealed class InventoryService : IInventoryService
         {
             var request = new UpdateProductRequestDto
             {
-                ProductName = product.Name.Trim(),
-                Category = product.Category.Trim(),
+                ProductCode = product.ProductCode.Trim(),
+                Name = product.Name.Trim(),
+                CategoryId = product.CategoryId,
                 UnitPrice = product.UnitPrice,
                 ReorderLevel = product.ReorderLevel
             };
@@ -161,8 +168,10 @@ public sealed class InventoryService : IInventoryService
         return new Product
         {
             Id = dto.ProductId,
+            ProductCode = dto.ProductCode,
+            CategoryId = dto.CategoryId,
             Name = dto.ProductName,
-            Category = CleanCategory(dto.Category),
+            Category = dto.Category.Trim(),
             Quantity = dto.Quantity,
             UnitPrice = dto.UnitPrice,
             ReorderLevel = dto.ReorderLevel,
@@ -170,20 +179,4 @@ public sealed class InventoryService : IInventoryService
         };
     }
 
-    private static string CleanCategory(string? rawCategory)
-    {
-        if (string.IsNullOrWhiteSpace(rawCategory))
-        {
-            return string.Empty;
-        }
-
-        // If category contains branch prefix (e.g., "Accra Central - Building Supplies"), strip prefix
-        if (rawCategory.Contains(" - "))
-        {
-            var parts = rawCategory.Split(" - ", 2);
-            return parts[1].Trim();
-        }
-
-        return rawCategory.Trim();
-    }
 }

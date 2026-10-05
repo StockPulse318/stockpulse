@@ -14,5 +14,5 @@ public interface IStockPulseApiClient
     Task DeleteProductAsync(int id, CancellationToken cancellationToken = default);
     Task StockInAsync(int productId, int quantity, CancellationToken cancellationToken = default);
     Task StockOutAsync(int productId, int quantity, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<string>> GetCategoriesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken = default);
 }

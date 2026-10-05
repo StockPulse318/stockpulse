@@ -9,7 +9,7 @@ using WarehouseInventory.Presentation.Services;
 
 namespace WarehouseInventory.Presentation.ViewModels;
 
-public sealed partial class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly IInventoryService _inventoryService;
     private readonly IAuthService _authService;
@@ -18,6 +18,7 @@ public sealed partial class MainViewModel : ObservableObject
     private CancellationTokenSource? _searchCts;
     private List<Product> _allLoadedProducts = new();
     private List<Product> _lowStockProducts = new();
+    private List<Category> _availableCategories = new();
 
     // User & Role
     public User? CurrentUser => _authService.CurrentUser;
@@ -266,8 +267,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (!CanManageProducts) return;
 
-        var categoriesList = Categories.Where(c => c != "All Categories").ToList();
-        if (_dialogService.ShowProductDialog(null, categoriesList, out var newProduct))
+        if (_dialogService.ShowProductDialog(null, _availableCategories, out var newProduct))
         {
             IsLoading = true;
             try
@@ -296,8 +296,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (!CanManageProducts || SelectedProduct == null) return;
         var existingProduct = SelectedProduct.Product;
 
-        var categoriesList = Categories.Where(c => c != "All Categories").ToList();
-        if (_dialogService.ShowProductDialog(existingProduct, categoriesList, out var updatedProduct))
+        if (_dialogService.ShowProductDialog(existingProduct, _availableCategories, out var updatedProduct))
         {
             IsLoading = true;
             try
@@ -368,13 +367,14 @@ public sealed partial class MainViewModel : ObservableObject
         try
         {
             var categories = await _inventoryService.GetCategoriesAsync();
+            _availableCategories = categories.ToList();
             Categories.Clear();
             Categories.Add("All Categories");
             foreach (var cat in categories)
             {
-                if (!Categories.Contains(cat))
+                if (!Categories.Contains(cat.Name))
                 {
-                    Categories.Add(cat);
+                    Categories.Add(cat.Name);
                 }
             }
         }
@@ -407,6 +407,10 @@ public sealed partial class MainViewModel : ObservableObject
                 if (!string.IsNullOrWhiteSpace(p.Category) && !Categories.Contains(p.Category))
                 {
                     Categories.Add(p.Category);
+                }
+                if (p.CategoryId > 0 && !_availableCategories.Any(c => c.Id == p.CategoryId))
+                {
+                    _availableCategories.Add(new Category(p.CategoryId, p.Category));
                 }
             }
 
@@ -508,5 +512,12 @@ public sealed partial class MainViewModel : ObservableObject
 
         OnPropertyChanged(nameof(HasPreviousPage));
         OnPropertyChanged(nameof(HasNextPage));
+    }
+
+    public void Dispose()
+    {
+        _authService.SessionExpired -= OnSessionExpired;
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
     }
 }

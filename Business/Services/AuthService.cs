@@ -46,6 +46,11 @@ public sealed class AuthService : IAuthService
 
     public void NotifySessionExpired()
     {
+        if (_currentUser == null && !_tokenStorage.IsAuthenticated)
+        {
+            return;
+        }
+
         Logout();
         SessionExpired?.Invoke("Your session has expired. Please log in again to continue.");
     }
@@ -57,7 +62,8 @@ public sealed class AuthService : IAuthService
             return UserRole.Clerk;
         }
 
-        if (roleString.Equals("Warehouse Manager", StringComparison.OrdinalIgnoreCase) ||
+        if (roleString.Equals("WAREHOUSE_MANAGER", StringComparison.OrdinalIgnoreCase) ||
+            roleString.Equals("Warehouse Manager", StringComparison.OrdinalIgnoreCase) ||
             roleString.Equals("Administrator", StringComparison.OrdinalIgnoreCase) ||
             roleString.Equals("Manager", StringComparison.OrdinalIgnoreCase))
         {
