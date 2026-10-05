@@ -1,0 +1,21 @@
+<Window x:Class="WarehouseInventory.Views.StockDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="400" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner" Background="{StaticResource PanelBrush}">
+    <StackPanel Margin="18,12,18,16">
+        <TextBlock x:Name="ProductText" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <TextBlock x:Name="CurrentText" Foreground="#666" Margin="0,2,0,0"/>
+
+        <TextBlock x:Name="QuantityLabel" Style="{StaticResource FieldLabel}" Margin="0,14,0,3"/>
+        <TextBox x:Name="QuantityBox" TextChanged="QuantityBox_TextChanged"/>
+
+        <TextBlock x:Name="PreviewText" Margin="0,8,0,0" Foreground="#444"/>
+        <TextBlock x:Name="ErrorText" Foreground="#C42B1C" MinHeight="20" Margin="0,4,0,0" TextWrapping="Wrap"/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button x:Name="OkButton" IsDefault="True" Style="{StaticResource MainButton}" Click="Ok_Click"/>
+            <Button Content="Cancel" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
