@@ -21,23 +21,30 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        base.OnStartup(e);
+        try
+        {
+            base.OnStartup(e);
 
-        ConfigureGlobalExceptionHandling();
+            ConfigureGlobalExceptionHandling();
 
-        var builder = new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false);
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false);
 
-        _configuration = builder.Build();
+            _configuration = builder.Build();
 
-        var services = new ServiceCollection();
-        ConfigureServices(services);
+            var services = new ServiceCollection();
+            ConfigureServices(services);
 
-        _serviceProvider = services.BuildServiceProvider();
+            _serviceProvider = services.BuildServiceProvider();
 
-        var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
-        dialogService.ShowLoginWindow();
+            var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
+            dialogService.ShowLoginWindow();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.ToString(), "Startup Error");
+        }
     }
 
     private void ConfigureServices(IServiceCollection services)

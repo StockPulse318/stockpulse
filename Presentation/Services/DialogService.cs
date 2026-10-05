@@ -115,13 +115,16 @@ public sealed class DialogService : IDialogService
     {
         App.Current?.Dispatcher?.Invoke(() =>
         {
+            var oldWindow = App.Current.MainWindow;
             var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();
             var mainWindow = new MainWindow(mainViewModel);
 
-            var oldWindow = App.Current.MainWindow;
             App.Current.MainWindow = mainWindow;
             mainWindow.Show();
-            oldWindow?.Close();
+            if (oldWindow != null && oldWindow != mainWindow)
+            {
+                oldWindow.Close();
+            }
         });
     }
 
@@ -129,6 +132,7 @@ public sealed class DialogService : IDialogService
     {
         App.Current?.Dispatcher?.Invoke(() =>
         {
+            var oldWindow = App.Current.MainWindow;
             var loginViewModel = _serviceProvider.GetRequiredService<LoginViewModel>();
             if (!string.IsNullOrWhiteSpace(message))
             {
@@ -136,11 +140,12 @@ public sealed class DialogService : IDialogService
             }
 
             var loginWindow = new LoginWindow(loginViewModel);
-
-            var oldWindow = App.Current.MainWindow;
             App.Current.MainWindow = loginWindow;
             loginWindow.Show();
-            oldWindow?.Close();
+            if (oldWindow != null && oldWindow != loginWindow)
+            {
+                oldWindow.Close();
+            }
         });
     }
 
