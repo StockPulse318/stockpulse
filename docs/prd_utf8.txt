@@ -1,0 +1,131 @@
+﻿PRODUCT REQUIREMENTS DOCUMENT (PRD)
+Warehouse Inventory Management System
+Team Members
+1. Hatsu Kimberly Elikem 22238891
+2. Lawrence Eshun 22245581
+3. Amoako Benedict Acheampong 22046313
+4. Vanessa Esinam Addi 22087398
+5. Jarawura Williams Koyiri 22013675
+6. ΓüáPrecious Ofoe 11102882
+7. Cyril Nii Teiko Tagoe 22241994
+8. ΓüáDarlington Mawuena Kelvin 22224432
+9. Amuzu Prince Elikplim Amuzu 22107096
+10. ΓüáMadugu Kelly 22121883
+11. ΓüáAgyenim-Boateng Osei Samuel-22245147
+12. ΓüáYoni Dzahene Quarshie-22241410
+Date : 25th June, 2026.
+1. Introduction
+1.1 Project Overview
+The Warehouse Inventory Management System is a desktop application developed to help warehouse managers and stock clerks efficiently manage inventory records. The system provides a centralized platform for storing product information, monitoring stock levels, updating inventory quantities, and generating low-stock alerts.
+Many warehouses rely on manual inventory tracking methods such as notebooks and spreadsheets. These methods are often prone to human error, data loss, and inefficiencies. This application aims to digitize inventory management processes and improve the accuracy and accessibility of stock information.
+1.2 Problem Statement
+Manual inventory management creates several challenges, including:
+Difficulty tracking available stock
+Delayed identification of low-stock products
+Errors in stock recording
+Inefficient searching and updating of inventory records
+The proposed system addresses these challenges by providing a computerized inventory management solution.
+1.3 Objectives
+The main objectives of the system are:
+To maintain accurate inventory records.
+To simplify product management.
+To provide automatic low-stock notifications.
+To enable quick searching and updating of products.
+To improve warehouse operational efficiency.
+2. Scope of the System
+The Warehouse Inventory Management System will focus on the core activities involved in inventory management.
+Included Features
+User Login
+Add Product
+View Products
+Update Product Information
+Delete Product
+Search Products
+Stock-In Operations
+Stock-Out Operations
+Low Stock Alerts
+Excluded Features
+Due to time constraints, the following features will not be implemented in Version 1.0:
+Barcode Scanning
+Cloud Synchronization
+Multi-Warehouse Management
+Mobile Application Support
+Advanced Reporting and Analytics
+3. User Requirements
+The system will serve two primary users:
+Warehouse Manager
+The warehouse manager will be responsible for:
+Monitoring inventory levels
+Managing product records
+Reviewing low-stock notifications
+Stock Clerk
+The stock clerk will be responsible for:
+Recording stock-in transactions
+Recording stock-out transactions
+Searching and updating inventory information
+User Expectations
+Users should be able to:
+Easily navigate the system
+Quickly find products
+Receive alerts when stock is running low
+Update inventory records efficiently
+4. Functional Requirements
+User Authentication
+The system shall provide a login screen where authorized users can enter their username and password before accessing the application.
+Product Management
+The system shall allow users to:
+Add new products
+View product details
+Modify existing products
+Delete products
+Each product record shall contain:
+Product ID
+Product Name
+Category
+Quantity
+Unit Price
+Reorder Level
+Inventory Management
+The system shall support stock movement operations.
+Stock-In
+Users shall be able to increase available stock quantities when new inventory arrives.
+Stock-Out
+Users shall be able to reduce stock quantities when products leave the warehouse.
+The system shall prevent inventory quantities from becoming negative.
+Search Functionality
+Users shall be able to search for products using:
+Product Name
+Product ID
+The search results shall be displayed instantly within the inventory list.
+Low Stock Alerts
+The system shall automatically compare current stock quantity with the reorder level.
+When:
+Quantity Γëñ Reorder Level
+The system shall display a warning message indicating that the product requires restocking.
+5. System Design and Technology
+Development Platform
+The application will be developed as a desktop application using Windows Presentation Foundation (WPF).
+Programming Language
+C#
+Database
+SQLite
+SQLite was selected because it is lightweight, easy to configure, and suitable for small to medium-sized desktop applications.
+Architecture
+The application will follow a three-layer architecture:
+Presentation Layer
+Responsible for user interaction through the graphical interface.
+Business Logic Layer
+Responsible for processing inventory operations and validations.
+Data Layer
+Responsible for storing and retrieving information from the SQLite database.
+6. Expected Outcomes
+Upon completion, the Warehouse Inventory Management System is expected to:
+Improve inventory record accuracy.
+Reduce manual stock management errors.
+Simplify inventory monitoring.
+Provide real-time visibility into stock levels.
+Notify users when products require restocking.
+The system will provide warehouse personnel with an efficient and reliable tool for managing inventory operations.
+7. Conclusion
+The Warehouse Inventory Management System is designed to provide a practical solution to common inventory management challenges faced by warehouses. Through features such as product management, stock tracking, search functionality, and low-stock alerts, the system will improve operational efficiency and support better inventory control.
+The project demonstrates the application of software engineering principles and desktop application development techniques using C#, WPF, and SQLite. The final product will serve as a functional inventory management tool while showcasing the team's technical and problem-solving capabilities.
