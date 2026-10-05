@@ -11,6 +11,7 @@ public partial class UsersWindow : Window
     private readonly IAuthService _auth;
     private readonly IInventoryService _inventory;
     private bool _updatingFilters;
+    private bool _ready;
 
     public UsersWindow(User currentUser, IAuthService auth, IInventoryService inventory)
     {
@@ -23,12 +24,15 @@ public partial class UsersWindow : Window
 
         Loaded += (s, e) =>
         {
+            if (RoleFilterBox.SelectedIndex < 0) RoleFilterBox.SelectedIndex = 0;
+            if (StatusFilterBox.SelectedIndex < 0) StatusFilterBox.SelectedIndex = 0;
+            _ready = true;
             InitBranchInputs();
             RefreshUsers();
         };
     }
 
-    private UserInfo? SelectedUser => UsersGrid.SelectedItem as UserInfo;
+    private UserInfo? SelectedUser => (_ready && UsersGrid != null) ? UsersGrid.SelectedItem as UserInfo : null;
 
     private void InitBranchInputs()
     {
@@ -82,7 +86,7 @@ public partial class UsersWindow : Window
 
     private void RefreshUsers(string? selectUsername = null)
     {
-        if (_updatingFilters) return;
+        if (!_ready || _updatingFilters) return;
         string? keep = selectUsername ?? SelectedUser?.Username;
 
         try
@@ -93,7 +97,7 @@ public partial class UsersWindow : Window
             var query = all.AsEnumerable();
 
             // Search filter
-            var term = (SearchBox.Text ?? "").Trim();
+            var term = (SearchBox?.Text ?? "").Trim();
             if (term.Length > 0)
             {
                 query = query.Where(u =>
@@ -102,38 +106,46 @@ public partial class UsersWindow : Window
             }
 
             // Branch filter
-            var selectedBranch = BranchFilterBox.SelectedItem as string ?? "All Branches";
+            var selectedBranch = BranchFilterBox?.SelectedItem as string ?? "All Branches";
             if (selectedBranch != "All Branches")
             {
                 query = query.Where(u => string.Equals(u.AssignedBranch, selectedBranch, StringComparison.OrdinalIgnoreCase));
             }
 
             // Role filter
-            if (RoleFilterBox.SelectedItem is ComboBoxItem roleItem && roleItem.Content?.ToString() is { } role && role != "All Roles")
+            if (RoleFilterBox?.SelectedItem is ComboBoxItem roleItem && roleItem.Content?.ToString() is { } role && role != "All Roles")
             {
                 query = query.Where(u => string.Equals(u.Role, role, StringComparison.OrdinalIgnoreCase));
             }
 
             // Status filter
-            if (StatusFilterBox.SelectedItem is ComboBoxItem statusItem && statusItem.Content?.ToString() is { } statusText)
+            if (StatusFilterBox?.SelectedItem is ComboBoxItem statusItem && statusItem.Content?.ToString() is { } statusText)
             {
                 if (statusText == "Active Only") query = query.Where(u => u.IsActive);
                 else if (statusText == "Suspended Only") query = query.Where(u => !u.IsActive);
             }
 
             var filtered = query.OrderBy(u => u.Username).ToList();
-            UsersGrid.ItemsSource = filtered;
-            UsersGrid.SelectedItem = filtered.FirstOrDefault(u => string.Equals(u.Username, keep, StringComparison.OrdinalIgnoreCase));
+            if (UsersGrid != null)
+            {
+                UsersGrid.ItemsSource = filtered;
+                UsersGrid.SelectedItem = filtered.FirstOrDefault(u => string.Equals(u.Username, keep, StringComparison.OrdinalIgnoreCase));
+            }
 
             int activeCount = all.Count(u => u.IsActive);
             int suspendedCount = all.Count - activeCount;
-            UserCountText.Text = $"Showing {filtered.Count} of {all.Count} accounts ({activeCount} active, {suspendedCount} suspended)";
+            if (UserCountText != null)
+            {
+                UserCountText.Text = $"Showing {filtered.Count} of {all.Count} accounts ({activeCount} active, {suspendedCount} suspended)";
+            }
 
             UpdateActionButtons();
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Failed to load user accounts: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (UserCountText != null)
+                UserCountText.Text = "Failed to load accounts.";
+            MessageBox.Show(this, $"Failed to load user accounts:\n\n{ex.Message}", "User Governance", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -143,18 +155,21 @@ public partial class UsersWindow : Window
         bool picked = selected != null;
         bool isSelf = picked && string.Equals(selected!.Username, _currentUser.Username, StringComparison.OrdinalIgnoreCase);
 
-        EditUserButton.IsEnabled = picked;
-        ResetPasswordButton.IsEnabled = picked;
-        ToggleStatusButton.IsEnabled = picked && !isSelf;
-        DeleteUserButton.IsEnabled = picked && !isSelf;
+        if (EditUserButton != null) EditUserButton.IsEnabled = picked;
+        if (ResetPasswordButton != null) ResetPasswordButton.IsEnabled = picked;
+        if (ToggleStatusButton != null) ToggleStatusButton.IsEnabled = picked && !isSelf;
+        if (DeleteUserButton != null) DeleteUserButton.IsEnabled = picked && !isSelf;
 
-        if (picked)
+        if (ToggleStatusButton != null)
         {
-            ToggleStatusButton.Content = selected!.IsActive ? "Suspend Account" : "Activate Account";
-        }
-        else
-        {
-            ToggleStatusButton.Content = "Toggle Status";
+            if (picked)
+            {
+                ToggleStatusButton.Content = selected!.IsActive ? "Suspend Account" : "Activate Account";
+            }
+            else
+            {
+                ToggleStatusButton.Content = "Toggle Status";
+            }
         }
     }
 
@@ -162,12 +177,23 @@ public partial class UsersWindow : Window
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        SearchHint.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (!_ready) return;
+        if (SearchHint != null)
+            SearchHint.Visibility = (SearchBox?.Text.Length ?? 0) == 0 ? Visibility.Visible : Visibility.Collapsed;
         RefreshUsers();
     }
 
-    private void Filter_Changed(object sender, SelectionChangedEventArgs e) => RefreshUsers();
-    private void Refresh_Click(object sender, RoutedEventArgs e) => RefreshUsers();
+    private void Filter_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_ready) return;
+        RefreshUsers();
+    }
+
+    private void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_ready) return;
+        RefreshUsers();
+    }
 
     private void AddUser_Click(object sender, RoutedEventArgs e)
     {

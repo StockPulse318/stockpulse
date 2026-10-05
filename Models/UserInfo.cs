@@ -1,7 +1,18 @@
+using System.Windows.Media;
+
 namespace WarehouseInventory.Models;
 
 public class UserInfo
 {
+    private static readonly Brush ActiveGreen = new SolidColorBrush(Color.FromRgb(0x10, 0x7C, 0x41));
+    private static readonly Brush SuspendedRed = new SolidColorBrush(Color.FromRgb(0xD1, 0x34, 0x38));
+
+    static UserInfo()
+    {
+        ActiveGreen.Freeze();
+        SuspendedRed.Freeze();
+    }
+
     public string Username { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
@@ -15,7 +26,7 @@ public class UserInfo
     public bool IsManager => IsAdmin || string.Equals(Role, "Warehouse Manager", StringComparison.OrdinalIgnoreCase);
 
     public string StatusText => IsActive ? "Active" : "Suspended";
-    public string StatusBadgeBrush => IsActive ? "#107C41" : "#D13438";
+    public Brush StatusBadgeBrush => IsActive ? ActiveGreen : SuspendedRed;
 
     public string RoleDescription => Role switch
     {

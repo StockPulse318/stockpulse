@@ -161,8 +161,19 @@ public partial class MainWindow : Window
 
     private void ManageUsers_Click(object sender, RoutedEventArgs e)
     {
-        var usersWindow = new UsersWindow(_user, _auth, _inventory) { Owner = this };
-        usersWindow.ShowDialog();
+        try
+        {
+            var usersWindow = new UsersWindow(_user, _auth, _inventory) { Owner = this };
+            usersWindow.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"Could not open User Governance:\n\n{ex.Message}",
+                "User Governance",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     // ----- product records (manager) -----

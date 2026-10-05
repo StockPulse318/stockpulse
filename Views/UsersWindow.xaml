@@ -93,7 +93,7 @@
 
             <ComboBox x:Name="RoleFilterBox" DockPanel.Dock="Left" Width="150" Height="28" Margin="8,0,0,0"
                       ToolTip="Filter by user role" SelectionChanged="Filter_Changed">
-                <ComboBoxItem Content="All Roles" IsSelected="True"/>
+                <ComboBoxItem Content="All Roles"/>
                 <ComboBoxItem Content="Administrator"/>
                 <ComboBoxItem Content="Warehouse Manager"/>
                 <ComboBoxItem Content="Stock Clerk"/>
@@ -101,7 +101,7 @@
 
             <ComboBox x:Name="StatusFilterBox" DockPanel.Dock="Left" Width="130" Height="28" Margin="8,0,0,0"
                       ToolTip="Filter by status" SelectionChanged="Filter_Changed">
-                <ComboBoxItem Content="All Statuses" IsSelected="True"/>
+                <ComboBoxItem Content="All Statuses"/>
                 <ComboBoxItem Content="Active Only"/>
                 <ComboBoxItem Content="Suspended Only"/>
             </ComboBox>

@@ -10,6 +10,16 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        DispatcherUnhandledException += (sender, args) =>
+        {
+            MessageBox.Show(
+                $"An unexpected error occurred:\n\n{args.Exception.Message}",
+                "StockPulse Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            args.Handled = true;
+        };
+
         var config = StockPulseConfig.Load();
         var client = new StockPulseApiClient(config.BaseUrl);
 
