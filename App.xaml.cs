@@ -58,6 +58,8 @@ public partial class App : Application
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            client.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue { NoCache = true, NoStore = true };
+            client.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
         });
 
         // 3. Business Logic Layer

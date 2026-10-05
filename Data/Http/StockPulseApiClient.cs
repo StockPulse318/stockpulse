@@ -136,6 +136,9 @@ public sealed class StockPulseApiClient : IStockPulseApiClient
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, bool includeAuth, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true, NoStore = true };
+        request.Headers.Pragma.ParseAdd("no-cache");
+
         if (includeAuth && !string.IsNullOrWhiteSpace(_tokenStorage.Token))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _tokenStorage.Token);
@@ -147,6 +150,9 @@ public sealed class StockPulseApiClient : IStockPulseApiClient
     private async Task<HttpResponseMessage> SendJsonAsync<T>(HttpMethod method, string path, T body, bool includeAuth, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true, NoStore = true };
+        request.Headers.Pragma.ParseAdd("no-cache");
+
         if (includeAuth && !string.IsNullOrWhiteSpace(_tokenStorage.Token))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _tokenStorage.Token);
