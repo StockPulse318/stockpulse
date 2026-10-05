@@ -1,109 +1,140 @@
-# StockPulse (WPF Front End)
+# StockPulse — Warehouse Inventory Management System (WPF Client)
 
-Front end for the StockPulse Warehouse Inventory Management System (DCIT 318). Built with C# and WPF on .NET 8.
+A fast, responsive, and uncluttered desktop application for warehouse inventory management built with **C#**, **Windows Presentation Foundation (WPF)**, and **.NET 8 (LTS)** based strictly on the Product Requirements Document (PRD).
 
-Communicates with the StockPulse REST API backend using HTTP client calls and JWT Bearer token authentication.
+The application communicates with a hosted REST API backend over HTTPS using JWT Bearer authentication, and never connects to a database directly.
 
 ---
 
-## Backend Connection
+## 1. Architectural Design (Three Layers)
 
-By default, the application connects to the deployed backend server:
+The application strictly adheres to the three-layer architecture specified in the PRD, with dependencies pointing strictly downward:
 
 ```
-https://stockpulse-backend-production-4c30.up.railway.app
+WarehouseInventory.sln
+│
+├── Presentation Layer (WarehouseInventory/Presentation)
+│   ├── ViewModels/          MVVM implementation using CommunityToolkit.Mvvm (ObservableObject, RelayCommand)
+│   ├── Views/               Clean XAML views with zero networking and no business rules in code-behind
+│   ├── Converters/          WPF value converters (BooleanToVisibilityConverter, InverseBooleanConverter)
+│   └── Services/            IDialogService & DialogService for modal interactions and window management
+│
+├── Business Logic Layer (WarehouseInventory/Business)
+│   ├── Models/              Domain entities: Product, User, UserRole (WarehouseManager, Clerk)
+│   ├── Validation/          Input validation: positive amounts, stock-out limits, non-negative price/reorder, required fields
+│   └── Services/            IAuthService & IInventoryService enforcing business logic before API dispatch
+│
+├── Data Layer (WarehouseInventory/Data)
+│   ├── Dtos/                Strongly-typed DTOs mirroring the OpenAPI contract exactly
+│   ├── Http/                Typed IStockPulseApiClient communicating via IHttpClientFactory & System.Text.Json
+│   └── State/               InMemoryTokenStorage keeping JWT access tokens in memory only (never written to disk)
+│
+└── Test Layer (WarehouseInventory.Tests)
+    ├── Business/            xUnit tests for validation rules, amount checks, low-stock threshold, and role enforcement
+    ├── Data/                xUnit tests for StockPulseApiClient using MockHttpMessageHandler (200, 400, 401, 403, network failure)
+    └── Presentation/        xUnit tests for MainViewModel (role visibility, pagination calculations, alerts filtering)
 ```
 
-### Changing the Backend Server
+---
 
-The application supports switching to any backend host (Railway, Render, local dev, etc.):
+## 2. Roles & Permissions
 
-1. **Via `appsettings.json`**:
-   ```json
-   {
-     "Backend": {
-       "BaseUrl": "https://stockpulse-backend-production-4c30.up.railway.app"
-     }
-   }
-   ```
-2. **Via Environment Variable**:
-   Set `STOCKPULSE_API_URL` or `Backend__BaseUrl` (e.g. `http://localhost:5000` or custom server).
-3. **Via the UI at Login**:
-   Expand the **Server Settings** drawer on the Login window to view or edit the backend server URL at runtime.
+The system supports two distinct roles defined by the PRD:
+
+| Role | Role Display Name | Inventory Search & Filter | Stock-In / Stock-Out | Add, Edit & Delete Products |
+|---|---|:---:|:---:|:---:|
+| `WAREHOUSE_MANAGER` | Warehouse Manager | Yes | Yes | **Yes** |
+| `CLERK` | Stock Clerk | Yes | Yes | **No** (Controls hidden) |
+
+- **Security Enforcement**: The server enforces all permissions. The client hides or disables management actions purely as a user convenience.
+- **Session Expiry**: When an authenticated session expires (HTTP 401), the application clears in-memory credentials and returns the user to the login window with an explanatory notice.
 
 ---
 
-## Authentication & Authorization
+## 3. Configuration
 
-All protected backend endpoints require a JWT Bearer token:
-- When a user logs in via `POST /api/auth/login`, the backend issues a signed JWT token.
-- The desktop client stores this token in `StockPulseApiClient` and automatically attaches it via `Authorization: Bearer <token>` to all subsequent requests (`/api/products`, `/api/products/{id}/stock/in`, etc.).
-- When logging out, the session and Bearer token are cleared.
-- Roles supported:
-  - **Warehouse Manager**: Full administrative access across all resources (manage products, manage users, move stock, view audit logs).
-  - **Stock Clerk**: Search products, move stock in/out, view own logs.
+The backend base URL is configured in `appsettings.json` using the `ApiBaseUrl` key:
 
-### User Account Management
+```json
+{
+  "ApiBaseUrl": "https://stockpulse-backend-production-4c30.up.railway.app"
+}
+```
 
-Warehouse Managers can manage user accounts directly inside the desktop client:
-1. Log in with a Warehouse Manager account (e.g. `admin`, `manager_accra`).
-2. Click **Manage Users** in the top toolbar (or `Users -> Manage User Accounts...` in the menu).
-3. In the **User Accounts & Access Roles** window:
-   - View all registered accounts, their roles, and system capabilities.
-   - Register new **Stock Clerk** or **Warehouse Manager** accounts (username, password of 8+ chars).
-   - Delete existing user accounts (self-deletion is prevented).
+- **No Hardcoded URLs or Credentials**: The application reads `ApiBaseUrl` at startup.
+- **No Seeding / Fake Data**: The application displays strictly what the remote API returns.
 
 ---
 
-## Multi-Branch Data & Seeding
+## 4. Key Functional Features
 
-The system is configured with inventory products and user accounts across multiple warehouse branches:
-- **Accra Central Warehouse** (Building Supplies, Electrical & Power)
-- **Tema Harbor Depot** (Hardware & Security, Heavy Rigging, Safety Gear, Paints & Coatings)
-- **Kumasi Regional Depot** (Plumbing & Drainage, Water Storage, Roofing & Timber, Machinery)
-- **Takoradi Logistics Hub** (Heavy Equipment, Cargo Handling, Power Tools, Fasteners)
+1. **Inventory List (Main Screen)**:
+   - DataGrid displaying Product ID, Product Name, Category, Quantity, Unit Price, and Reorder Level.
+   - Enabled UI virtualization (`VirtualizingStackPanel.VirtualizationMode="Recycling"`) for smooth rendering of large catalogs.
+   - Search box with 300 ms debounce and in-flight request cancellation (`CancellationTokenSource`), keeping existing rows visible while new results load.
+   - Category filtering dropdown and column header sorting.
+   - Paging navigation controls (Previous / Next / Page Info / Page Size).
+   - Low-stock warning: Any product whose quantity is $\le$ reorder level (`is_low_stock` flag) is highlighted and marked **"⚠ Restock needed"**.
 
-### Seeding Any Remote / Hosted Backend via API
+2. **Stock Operations**:
+   - Stock-In and Stock-Out buttons available for the selected product.
+   - Focused dialog rejecting zero, negative, and non-integer inputs before any HTTP request is issued.
+   - Validates that stock-out quantities do not exceed available inventory, displaying the server's refusal message if rejected.
+   - Dynamically refreshes the affected row and updates the low-stock alert counter.
 
-To seed a live hosted backend (e.g. on Railway or Render):
+3. **Low-Stock Alerts**:
+   - Dedicated Alerts tab displaying only products requiring replenishment, populated from `/api/Products/low-stock`.
+   - Real-time badge counter displayed directly on the navigation tab.
+
+4. **Product Management (Warehouse Manager Only)**:
+   - Add and Edit dialog with Product Name, Category dropdown, Unit Price, Reorder Level, and Quantity.
+   - Category ComboBox populated from available categories (never typed freely).
+   - Delete confirmation dialog with server refusal message displayed on rejection.
+
+---
+
+## 5. Prerequisites & Building
+
+### Prerequisites
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (or .NET 10 SDK with .NET 8 targeting)
+- Windows 10/11 x64
+
+### Build the Solution
 ```powershell
-.\seed-remote-api.ps1 -BaseUrl "https://stockpulse-backend-production-4c30.up.railway.app" -Username "admin" -Password "Admin@1234"
+dotnet build WarehouseInventory.sln -c Release /p:TreatWarningsAsErrors=true
 ```
-This authenticates via JWT and provisions all branch accounts and products over the official REST endpoints.
 
-## Deploying Frontend on Render
+### Run Unit Tests
+```powershell
+dotnet test WarehouseInventory.sln -c Release
+```
+*Current test suite: **38 passed**, 0 failed, 0 skipped.*
 
-This repository includes a `Dockerfile` and `nginx.conf` to deploy a live web distribution portal on Render:
+### Run the Desktop Application
+```powershell
+dotnet run --project WarehouseInventory.csproj
+```
 
-1. Create a **New Web Service** on Render and connect this repository.
-2. Select **Docker** as the Runtime.
-3. Render will automatically build the `Dockerfile`, spin up Nginx on port `10000`, and serve the web download page where users and graders can download the pre-configured Windows app.
+### Publish Single-File Executable
+The application is configured for framework-dependent single-file publishing for `win-x64`:
+
+```powershell
+dotnet publish WarehouseInventory.csproj -c Release -r win-x64 --no-self-contained /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true -o ./publish-win
+```
+
+- **Output Executable**: `./publish-win/WarehouseInventory.exe`
+- **Published Size**: **~1.23 MB (1,294,401 bytes)**.
 
 ---
 
-## How to Run Locally
+## 6. Backend Mismatches & Assumptions
 
-1. Ensure the .NET 8 SDK is installed.
-2. Run from the terminal:
-   ```bash
-   dotnet run
-   ```
-   Or open `WarehouseInventory.csproj` in Visual Studio 2022 and press **F5**.
-
----
-
-## Project Structure
-
-- `Models/`: `Product`, `User`, `UserRole`.
-- `Services/`:
-  - `StockPulseConfig`: Manages configuration loading (`appsettings.json`, environment variables).
-  - `StockPulseApiClient`: Handles HTTP requests, JWT Bearer tokens, response mapping, and error translation.
-  - `AuthService`: Implementation of `IAuthService` backed by the REST API.
-  - `InventoryService`: Implementation of `IInventoryService` backed by the REST API.
-  - `InventoryException`: Business and server error exceptions displayed to the user.
-- `ViewModels/`: `ProductRow` for formatting DataGrid rows, low-stock indicators, and threshold ticks.
-- `Views/`:
-  - `LoginWindow`: Login screen with credentials and expandable Server Settings.
-  - `MainWindow`: Inventory dashboard, search, filter, stock in/out, add/edit/delete product dialogs.
-  - `ProductDialog`: Add and Edit product dialog with server-assigned IDs.
-  - `StockDialog`: Stock-In and Stock-Out dialog with live validation.
+1. **Categories Endpoint**:
+   - The backend OpenAPI specification does not expose `/api/products/categories` (returns HTTP 404).
+   - **Resolution**: The client attempts `/api/products/categories` and gracefully falls back to querying the product catalog to extract and sort distinct categories.
+2. **Low-Stock Endpoint**:
+   - Confirmed present at `GET /api/Products/low-stock` requiring Bearer authentication. Used to populate the Low-Stock Alerts tab and badge count.
+3. **Error Payload Formats**:
+   - Handled flexibly for both nested format `{ "error": { "code", "message" } }` and flat string format `{ "error": "Invalid username or password." }` or `{ "message": "..." }`.
+4. **Scope Exclusions Enforced**:
+   - Per the PRD, multiple warehouse/branch selection, barcode scanning, cloud sync, mobile support, advanced reporting/analytics, and user management screens are strictly excluded from the client.
