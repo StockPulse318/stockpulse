@@ -1,17 +1,47 @@
 <#
 .SYNOPSIS
-    Seeds an active StockPulse REST API backend with multi-branch warehouse products and user accounts.
+    Seeds an active StockPulse REST API backend (Local or Remote) with multi-branch warehouse products and user accounts.
 .EXAMPLE
-    .\seed-remote-api.ps1 -BaseUrl "https://stockpulse-backend-production-4c30.up.railway.app" -Username "admin" -Password "Admin@1234"
+    # Seed local backend (default port 5000 or 5242):
+    .\seed-remote-api.ps1 -Local
+
+    # Seed custom URL with admin credentials:
+    .\seed-remote-api.ps1 -BaseUrl "http://localhost:5000" -Username "admin" -Password "Admin@1234"
 #>
 
 param(
-    [string]$BaseUrl = "https://stockpulse-backend-production-4c30.up.railway.app",
-    [Parameter(Mandatory=$true)]
-    [string]$Username,
-    [Parameter(Mandatory=$true)]
-    [string]$Password
+    [string]$BaseUrl = "",
+    [switch]$Local,
+    [string]$Username = "admin",
+    [string]$Password = "Admin@1234"
 )
+
+# Auto-detect target backend URL if not explicitly passed
+if ($Local -or [string]::IsNullOrWhiteSpace($BaseUrl)) {
+    $localCandidates = @("http://localhost:5000", "http://localhost:5242", "http://127.0.0.1:5000")
+    $detectedUrl = $null
+
+    foreach ($candidate in $localCandidates) {
+        try {
+            $test = Invoke-WebRequest -Uri "$candidate/swagger/v1/swagger.json" -Method Head -TimeoutSec 2 -ErrorAction SilentlyContinue
+            if ($test.StatusCode -eq 200) {
+                $detectedUrl = $candidate
+                break
+            }
+        } catch { }
+    }
+
+    if ($detectedUrl) {
+        $BaseUrl = $detectedUrl
+        Write-Host "Detected active local StockPulse backend at: $BaseUrl" -ForegroundColor Cyan
+    } elseif ($Local) {
+        $BaseUrl = "http://localhost:5000"
+        Write-Host "Using default local backend URL: $BaseUrl" -ForegroundColor Yellow
+    } else {
+        $BaseUrl = "https://stockpulse-backend-production-4c30.up.railway.app"
+        Write-Host "No local backend found; targeting remote URL: $BaseUrl" -ForegroundColor Cyan
+    }
+}
 
 $BaseUrl = $BaseUrl.Trim().TrimEnd('/')
 
@@ -25,7 +55,7 @@ $loginBody = @{
 try {
     $loginResp = Invoke-RestMethod -Uri "$BaseUrl/api/auth/login" -Method Post -ContentType "application/json" -Body $loginBody
 } catch {
-    Write-Error "Failed to authenticate. Verify server URL and credentials: $_"
+    Write-Error "Failed to authenticate. Verify server URL ($BaseUrl) and credentials: $_"
     exit 1
 }
 
@@ -33,8 +63,8 @@ $token = $loginResp.token
 $role = $loginResp.role
 Write-Host "Authentication successful! Role: $role" -ForegroundColor Green
 
-if ($role -ne "Warehouse Manager") {
-    Write-Error "Seeding requires a 'Warehouse Manager' account to register products and users. Current account is '$role'."
+if ($role -ne "Warehouse Manager" -and $role -ne "Administrator") {
+    Write-Error "Seeding requires an 'Administrator' or 'Warehouse Manager' account to register products and users. Current account is '$role'."
     exit 1
 }
 
@@ -42,24 +72,34 @@ $headers = @{
     Authorization = "Bearer $token"
 }
 
-# 1. Seed User Accounts
+# 1. Seed User Accounts across Branches
 Write-Host "`nProvisioning branch accounts..." -ForegroundColor Cyan
 $users = @(
-    @{ Username = "manager_accra"; Password = "Manager@1234"; Role = "Warehouse Manager" },
-    @{ Username = "manager_kumasi"; Password = "Manager@1234"; Role = "Warehouse Manager" },
-    @{ Username = "manager_tema"; Password = "Manager@1234"; Role = "Warehouse Manager" },
-    @{ Username = "clerk_accra"; Password = "Clerk@1234"; Role = "Stock Clerk" },
-    @{ Username = "clerk_kumasi"; Password = "Clerk@1234"; Role = "Stock Clerk" },
-    @{ Username = "clerk_tema"; Password = "Clerk@1234"; Role = "Stock Clerk" },
-    @{ Username = "kofi_mensah"; Password = "Clerk@1234"; Role = "Stock Clerk" },
-    @{ Username = "ama_boateng"; Password = "Clerk@1234"; Role = "Stock Clerk" }
+    @{ Username = "manager"; Password = "Manager@1234"; Role = "Warehouse Manager"; FullName = "National Operations Lead"; AssignedBranch = "All Branches" },
+    @{ Username = "clerk"; Password = "Clerk@1234"; Role = "Stock Clerk"; FullName = "General Floating Clerk"; AssignedBranch = "All Branches" },
+    @{ Username = "manager_accra"; Password = "Manager@1234"; Role = "Warehouse Manager"; FullName = "Kwame Mensah"; AssignedBranch = "Accra Central" },
+    @{ Username = "manager_kumasi"; Password = "Manager@1234"; Role = "Warehouse Manager"; FullName = "Yaw Frimpong"; AssignedBranch = "Kumasi Depot" },
+    @{ Username = "manager_tema"; Password = "Manager@1234"; Role = "Warehouse Manager"; FullName = "Abena Osei"; AssignedBranch = "Tema Harbor" },
+    @{ Username = "manager_takoradi"; Password = "Manager@1234"; Role = "Warehouse Manager"; FullName = "Ebenezer Quaye"; AssignedBranch = "Takoradi Logistics" },
+    @{ Username = "clerk_accra"; Password = "Clerk@1234"; Role = "Stock Clerk"; FullName = "Emmanuel Addo"; AssignedBranch = "Accra Central" },
+    @{ Username = "clerk_kumasi"; Password = "Clerk@1234"; Role = "Stock Clerk"; FullName = "Akosua Serwaa"; AssignedBranch = "Kumasi Depot" },
+    @{ Username = "clerk_tema"; Password = "Clerk@1234"; Role = "Stock Clerk"; FullName = "Samuel Annan"; AssignedBranch = "Tema Harbor" },
+    @{ Username = "clerk_takoradi"; Password = "Clerk@1234"; Role = "Stock Clerk"; FullName = "Grace Tandoh"; AssignedBranch = "Takoradi Logistics" },
+    @{ Username = "kofi_mensah"; Password = "Clerk@1234"; Role = "Stock Clerk"; FullName = "Kofi Mensah Jr."; AssignedBranch = "Accra Central" },
+    @{ Username = "ama_boateng"; Password = "Clerk@1234"; Role = "Stock Clerk"; FullName = "Ama Boateng"; AssignedBranch = "Tema Harbor" }
 )
 
 foreach ($u in $users) {
     try {
-        $body = @{ username = $u.Username; password = $u.Password; role = $u.Role } | ConvertTo-Json
+        $body = @{
+            username = $u.Username
+            password = $u.Password
+            role = $u.Role
+            fullName = $u.FullName
+            assignedBranch = $u.AssignedBranch
+        } | ConvertTo-Json
         Invoke-RestMethod -Uri "$BaseUrl/api/auth/users" -Method Post -Headers $headers -ContentType "application/json" -Body $body | Out-Null
-        Write-Host "  [+] Created account: $($u.Username) ($($u.Role))" -ForegroundColor Green
+        Write-Host "  [+] Created account: $($u.Username) ($($u.Role) - $($u.AssignedBranch))" -ForegroundColor Green
     } catch {
         Write-Host "  [-] User '$($u.Username)' already exists or skipped." -ForegroundColor Yellow
     }
