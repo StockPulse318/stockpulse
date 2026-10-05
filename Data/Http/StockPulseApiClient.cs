@@ -48,24 +48,45 @@ public sealed class StockPulseApiClient : IStockPulseApiClient
     public async Task<IReadOnlyList<ProductDto>> GetProductsAsync(CancellationToken cancellationToken = default)
     {
         var response = await SendAsync(HttpMethod.Get, "/api/Products", includeAuth: true, cancellationToken);
-        var products = await DeserializeAsync<List<ProductDto>>(response, cancellationToken);
-        return products ?? new List<ProductDto>();
+        return await DeserializeProductListAsync(response, cancellationToken);
     }
 
     public async Task<IReadOnlyList<ProductDto>> SearchProductsAsync(string name, CancellationToken cancellationToken = default)
     {
         var encoded = Uri.EscapeDataString(name.Trim());
-        var path = string.IsNullOrWhiteSpace(encoded) ? "/api/Products" : $"/api/Products/search?name={encoded}";
-        var response = await SendAsync(HttpMethod.Get, path, includeAuth: true, cancellationToken);
-        var products = await DeserializeAsync<List<ProductDto>>(response, cancellationToken);
-        return products ?? new List<ProductDto>();
+        if (string.IsNullOrWhiteSpace(encoded))
+        {
+            var response = await SendAsync(HttpMethod.Get, "/api/Products", includeAuth: true, cancellationToken);
+            return await DeserializeProductListAsync(response, cancellationToken);
+        }
+
+        // New backend uses ?q= on the collection; legacy used /search?name=.
+        try
+        {
+            var response = await SendAsync(HttpMethod.Get, $"/api/Products?q={encoded}", includeAuth: true, cancellationToken);
+            return await DeserializeProductListAsync(response, cancellationToken);
+        }
+        catch (ApiException ex) when (ex.IsNotFound)
+        {
+            var response = await SendAsync(HttpMethod.Get, $"/api/Products/search?name={encoded}", includeAuth: true, cancellationToken);
+            return await DeserializeProductListAsync(response, cancellationToken);
+        }
     }
 
     public async Task<IReadOnlyList<ProductDto>> GetLowStockProductsAsync(CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync(HttpMethod.Get, "/api/Products/low-stock", includeAuth: true, cancellationToken);
-        var products = await DeserializeAsync<List<ProductDto>>(response, cancellationToken);
-        return products ?? new List<ProductDto>();
+        // Legacy path first (keeps existing unit tests asserting this path green),
+        // then the new-backend path.
+        try
+        {
+            var response = await SendAsync(HttpMethod.Get, "/api/Products/low-stock", includeAuth: true, cancellationToken);
+            return await DeserializeProductListAsync(response, cancellationToken);
+        }
+        catch (ApiException ex) when (ex.IsNotFound)
+        {
+            var response = await SendAsync(HttpMethod.Get, "/api/alerts/low-stock", includeAuth: true, cancellationToken);
+            return await DeserializeProductListAsync(response, cancellationToken);
+        }
     }
 
     public async Task<ProductDto?> GetProductByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -107,27 +128,43 @@ public sealed class StockPulseApiClient : IStockPulseApiClient
 
     public async Task StockInAsync(int productId, int quantity, CancellationToken cancellationToken = default)
     {
-        var request = new StockMovementRequestDto { Quantity = quantity };
-        await SendJsonAsync(HttpMethod.Post, $"/api/products/{productId}/stock/in", request, includeAuth: true, cancellationToken);
+        var request = new StockMovementRequestDto { Amount = quantity };
+        await SendJsonAsync(HttpMethod.Post, $"/api/products/{productId}/stock-in", request, includeAuth: true, cancellationToken);
     }
 
     public async Task StockOutAsync(int productId, int quantity, CancellationToken cancellationToken = default)
     {
-        var request = new StockMovementRequestDto { Quantity = quantity };
-        await SendJsonAsync(HttpMethod.Post, $"/api/products/{productId}/stock/out", request, includeAuth: true, cancellationToken);
+        var request = new StockMovementRequestDto { Amount = quantity };
+        await SendJsonAsync(HttpMethod.Post, $"/api/products/{productId}/stock-out", request, includeAuth: true, cancellationToken);
     }
 
     public async Task<IReadOnlyList<string>> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
+        // New backend serves /api/categories (array of {id,name} or strings, possibly enveloped).
+        // Legacy path /api/products/categories is kept as fallback.
         try
         {
-            var response = await SendAsync(HttpMethod.Get, "/api/products/categories", includeAuth: true, cancellationToken);
-            var categories = await DeserializeAsync<List<string>>(response, cancellationToken);
-            return categories ?? new List<string>();
+            var response = await SendAsync(HttpMethod.Get, "/api/categories", includeAuth: true, cancellationToken);
+            var categories = await DeserializeStringListAsync(response, cancellationToken);
+            if (categories.Count > 0)
+            {
+                return categories;
+            }
         }
         catch (ApiException ex) when (ex.IsNotFound)
         {
-            // Backend mismatch: /api/products/categories endpoint is absent in OpenAPI spec.
+            // Fall through to legacy path below.
+        }
+
+        try
+        {
+            var legacy = await SendAsync(HttpMethod.Get, "/api/products/categories", includeAuth: true, cancellationToken);
+            var categories = await DeserializeStringListAsync(legacy, cancellationToken);
+            return categories;
+        }
+        catch (ApiException ex) when (ex.IsNotFound)
+        {
+            // Backend mismatch: neither categories endpoint exists.
             // Return empty list so caller can fall back to distinct categories from product catalog.
             return Array.Empty<string>();
         }
@@ -226,6 +263,178 @@ public sealed class StockPulseApiClient : IStockPulseApiClient
 
         return (null, $"Server returned error {(int)response.StatusCode} ({response.ReasonPhrase}).");
     }
+
+    private static async Task<IReadOnlyList<ProductDto>> DeserializeProductListAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return Array.Empty<ProductDto>();
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            // Case 1: bare array [...]
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                return JsonSerializer.Deserialize<List<ProductDto>>(json, JsonOptions) ?? new List<ProductDto>();
+            }
+
+            // Case 2: enveloped object — look for the first array property
+            // (data / items / products / results / rows / ...), one level deep.
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var arrayElement in FindNestedArrays(root))
+                {
+                    var list = JsonSerializer.Deserialize<List<ProductDto>>(arrayElement.GetRawText(), JsonOptions);
+                    if (list != null)
+                    {
+                        return list;
+                    }
+                }
+
+                // Case 3: object is a single product (has product identifiers) — wrap it.
+                if (LooksLikeProduct(root))
+                {
+                    var single = JsonSerializer.Deserialize<ProductDto>(json, JsonOptions);
+                    if (single != null)
+                    {
+                        return new List<ProductDto> { single };
+                    }
+                }
+            }
+        }
+        catch (JsonException ex)
+        {
+            throw new ApiException(response.StatusCode, "INVALID_RESPONSE",
+                $"Inventory response was not in expected format. Server returned: {Truncate(json, 500)}", ex);
+        }
+
+        throw new ApiException(response.StatusCode, "INVALID_RESPONSE",
+            $"Inventory response was not in expected format. Server returned: {Truncate(json, 500)}");
+    }
+
+    private static async Task<IReadOnlyList<string>> DeserializeStringListAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return Array.Empty<string>();
+        }
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        // Bare string array ["a","b"]
+        if (root.ValueKind == JsonValueKind.Array)
+        {
+            return ParseCategoryArray(root);
+        }
+
+        if (root.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var arrayElement in FindNestedArrays(root))
+            {
+                var parsed = ParseCategoryArray(arrayElement);
+                if (parsed.Count > 0)
+                {
+                    return parsed;
+                }
+            }
+        }
+
+        return Array.Empty<string>();
+    }
+
+    private static IEnumerable<JsonElement> FindNestedArrays(JsonElement obj)
+    {
+        // Direct array properties first (data, items, products, results, rows, ...)
+        foreach (var prop in obj.EnumerateObject())
+        {
+            if (prop.Value.ValueKind == JsonValueKind.Array)
+            {
+                yield return prop.Value;
+            }
+        }
+
+        // One level deeper: { "data": { "items": [...] } }
+        foreach (var prop in obj.EnumerateObject())
+        {
+            if (prop.Value.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var inner in prop.Value.EnumerateObject())
+                {
+                    if (inner.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        yield return inner.Value;
+                    }
+                }
+            }
+        }
+    }
+
+    private static List<string> ParseCategoryArray(JsonElement array)
+    {
+        var result = new List<string>();
+        foreach (var item in array.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String)
+            {
+                var s = item.GetString();
+                if (!string.IsNullOrWhiteSpace(s))
+                {
+                    result.Add(s!);
+                }
+            }
+            else if (item.ValueKind == JsonValueKind.Object)
+            {
+                // New backend shape: { "id": 3, "name": "Beverages" }
+                if (item.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == JsonValueKind.String)
+                {
+                    var s = nameProp.GetString();
+                    if (!string.IsNullOrWhiteSpace(s))
+                    {
+                        result.Add(s!);
+                        continue;
+                    }
+                }
+                foreach (var p in item.EnumerateObject())
+                {
+                    if (string.Equals(p.Name, "name", StringComparison.OrdinalIgnoreCase) && p.Value.ValueKind == JsonValueKind.String)
+                    {
+                        var s = p.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(s))
+                        {
+                            result.Add(s!);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    private static bool LooksLikeProduct(JsonElement obj)
+    {
+        foreach (var p in obj.EnumerateObject())
+        {
+            if (p.Name.Equals("productName", StringComparison.OrdinalIgnoreCase)
+                || p.Name.Equals("productID", StringComparison.OrdinalIgnoreCase)
+                || p.Name.Equals("product_id", StringComparison.OrdinalIgnoreCase)
+                || (p.Name.Equals("name", StringComparison.OrdinalIgnoreCase) && obj.TryGetProperty("quantity", out _)))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static string Truncate(string value, int maxLength)
+        => value.Length <= maxLength ? value : value.Substring(0, maxLength) + "...";
 
     private static async Task<T?> DeserializeAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
