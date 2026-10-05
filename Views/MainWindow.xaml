@@ -11,6 +11,9 @@
                 <Separator/>
                 <MenuItem Header="E_xit" Click="Exit_Click"/>
             </MenuItem>
+            <MenuItem Header="_Users" x:Name="UsersMenuItem">
+                <MenuItem Header="_Manage User Accounts..." Click="ManageUsers_Click"/>
+            </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_About" Click="About_Click"/>
             </MenuItem>
@@ -31,19 +34,24 @@
 
             <!-- toolbar: right-docked buttons are listed right to left -->
             <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+                <Button x:Name="ManageUsersButton" Content="_Manage Users" DockPanel.Dock="Right" Click="ManageUsers_Click"/>
                 <Button x:Name="DeleteButton" Content="_Delete" DockPanel.Dock="Right" Click="Delete_Click"/>
                 <Button x:Name="EditButton" Content="_Edit" DockPanel.Dock="Right" Click="Edit_Click"/>
                 <Button x:Name="AddButton" Content="_Add Product" DockPanel.Dock="Right" Style="{StaticResource MainButton}" Click="Add_Click"/>
                 <Button x:Name="StockOutButton" Content="Stock _Out" DockPanel.Dock="Right" Click="StockOut_Click"/>
                 <Button x:Name="StockInButton" Content="Stock _In" DockPanel.Dock="Right" Click="StockIn_Click"/>
 
-                <Grid Width="270" DockPanel.Dock="Left">
+                <Grid Width="220" DockPanel.Dock="Left">
                     <TextBox x:Name="SearchBox" Height="28" TextChanged="SearchBox_TextChanged"/>
-                    <TextBlock x:Name="SearchHint" Text="Search by product name or ID" Foreground="Gray"
+                    <TextBlock x:Name="SearchHint" Text="Search by name or ID" Foreground="Gray"
                                IsHitTestVisible="False" Margin="7,0,0,0" VerticalAlignment="Center"/>
                 </Grid>
+                <ComboBox x:Name="BranchFilterBox" DockPanel.Dock="Left" Width="145" Height="28" Margin="8,0,0,0"
+                          ToolTip="Filter by warehouse branch" SelectionChanged="Filter_Changed"/>
+                <ComboBox x:Name="CategoryFilterBox" DockPanel.Dock="Left" Width="145" Height="28" Margin="8,0,0,0"
+                          ToolTip="Filter by product category" SelectionChanged="Filter_Changed"/>
                 <CheckBox x:Name="LowOnlyBox" Content="Low stock only" DockPanel.Dock="Left"
-                          VerticalAlignment="Center" Margin="14,0,0,0"
+                          VerticalAlignment="Center" Margin="12,0,0,0"
                           Checked="Filter_Changed" Unchecked="Filter_Changed"/>
             </DockPanel>
 
@@ -83,9 +91,10 @@
                         </Style>
                     </DataGrid.CellStyle>
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Product ID" Binding="{Binding Id}" Width="90"/>
+                        <DataGridTextColumn Header="Product ID" Binding="{Binding Id}" Width="85"/>
                         <DataGridTextColumn Header="Product Name" Binding="{Binding Name}" Width="*"/>
-                        <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="110"/>
+                        <DataGridTextColumn Header="Branch / Warehouse" Binding="{Binding Branch}" Width="150"/>
+                        <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="140"/>
                         <DataGridTemplateColumn Header="Quantity (tick = reorder level)" Width="270" SortMemberPath="Quantity">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>

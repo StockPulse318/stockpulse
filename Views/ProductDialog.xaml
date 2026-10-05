@@ -15,13 +15,16 @@
                 <TextBox x:Name="IdBox"/>
             </StackPanel>
             <StackPanel Grid.Column="2">
-                <TextBlock Text="Category" Style="{StaticResource FieldLabel}"/>
-                <ComboBox x:Name="CategoryBox" IsEditable="True" Height="26"/>
+                <TextBlock Text="Warehouse Branch" Style="{StaticResource FieldLabel}"/>
+                <ComboBox x:Name="BranchBox" IsEditable="True" Height="26"/>
             </StackPanel>
         </Grid>
 
         <TextBlock Text="Product name" Style="{StaticResource FieldLabel}"/>
         <TextBox x:Name="NameBox"/>
+
+        <TextBlock Text="Product Category" Style="{StaticResource FieldLabel}"/>
+        <ComboBox x:Name="CategoryBox" IsEditable="True" Height="26"/>
 
         <Grid>
             <Grid.ColumnDefinitions>

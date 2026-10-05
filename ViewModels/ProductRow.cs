@@ -29,6 +29,7 @@ public class ProductRow
     public Product Product { get; }
     public string Id => Product.Id;
     public string Name => Product.Name;
+    public string Branch => Product.Branch;
     public string Category => Product.Category;
     public int Quantity => Product.Quantity;
     public int ReorderLevel => Product.ReorderLevel;

@@ -10,17 +10,23 @@ public partial class ProductDialog : Window
     private readonly int _existingQuantity;
 
     // Pass existing = null to add a new product.
-    public ProductDialog(string productId, Product? existing, IEnumerable<string> categories)
+    public ProductDialog(string productId, Product? existing, IEnumerable<string>? categories = null, IEnumerable<string>? branches = null)
     {
         InitializeComponent();
         _isEdit = existing != null;
         Title = _isEdit ? "Edit Product" : "Add Product";
-        CategoryBox.ItemsSource = categories.ToList();
+
+        var catList = categories?.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().OrderBy(c => c).ToList() ?? new List<string>();
+        CategoryBox.ItemsSource = catList;
+
+        var branchList = branches?.Where(b => !string.IsNullOrWhiteSpace(b)).Distinct().OrderBy(b => b).ToList() ?? new List<string>();
+        BranchBox.ItemsSource = branchList;
 
         IdBox.Text = productId;
         if (existing != null)
         {
             NameBox.Text = existing.Name;
+            BranchBox.Text = existing.Branch;
             CategoryBox.Text = existing.Category;
             QuantityBox.Text = existing.Quantity.ToString();
             ReorderBox.Text = existing.ReorderLevel.ToString();
@@ -35,6 +41,8 @@ public partial class ProductDialog : Window
         {
             IdBox.IsEnabled = false;
             IdBox.Text = string.IsNullOrWhiteSpace(productId) ? "(Auto)" : productId;
+            if (branchList.Count > 0) BranchBox.SelectedIndex = 0;
+            if (catList.Count > 0) CategoryBox.SelectedIndex = 0;
             HintText.Text = "Product ID is assigned automatically by the server.";
             QuantityBox.Text = "0";
             ReorderBox.Text = "10";
@@ -51,11 +59,12 @@ public partial class ProductDialog : Window
     {
         string id = IdBox.Text.Trim();
         string name = NameBox.Text.Trim();
+        string branch = BranchBox.Text.Trim();
         string category = CategoryBox.Text.Trim();
 
-        if (name.Length == 0 || category.Length == 0)
+        if (name.Length == 0 || category.Length == 0 || branch.Length == 0)
         {
-            ErrorText.Text = "Product name and category are required.";
+            ErrorText.Text = "Product name, branch, and category are required.";
             return;
         }
 
@@ -89,6 +98,7 @@ public partial class ProductDialog : Window
         {
             Id = id,
             Name = name,
+            Branch = branch,
             Category = category,
             Quantity = quantity,
             ReorderLevel = reorder,

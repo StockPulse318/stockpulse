@@ -40,10 +40,36 @@ All protected backend endpoints require a JWT Bearer token:
 - The desktop client stores this token in `StockPulseApiClient` and automatically attaches it via `Authorization: Bearer <token>` to all subsequent requests (`/api/products`, `/api/products/{id}/stock/in`, etc.).
 - When logging out, the session and Bearer token are cleared.
 - Roles supported:
-  - **Warehouse Manager**: Full access (add, edit, delete products, stock movements).
-  - **Stock Clerk**: Search products and move stock in/out.
+  - **Warehouse Manager**: Full administrative access across all resources (manage products, manage users, move stock, view audit logs).
+  - **Stock Clerk**: Search products, move stock in/out, view own logs.
+
+### User Account Management
+
+Warehouse Managers can manage user accounts directly inside the desktop client:
+1. Log in with a Warehouse Manager account (e.g. `admin`, `manager_accra`).
+2. Click **Manage Users** in the top toolbar (or `Users -> Manage User Accounts...` in the menu).
+3. In the **User Accounts & Access Roles** window:
+   - View all registered accounts, their roles, and system capabilities.
+   - Register new **Stock Clerk** or **Warehouse Manager** accounts (username, password of 8+ chars).
+   - Delete existing user accounts (self-deletion is prevented).
 
 ---
+
+## Multi-Branch Data & Seeding
+
+The system is configured with inventory products and user accounts across multiple warehouse branches:
+- **Accra Central Warehouse** (Building Supplies, Electrical & Power)
+- **Tema Harbor Depot** (Hardware & Security, Heavy Rigging, Safety Gear, Paints & Coatings)
+- **Kumasi Regional Depot** (Plumbing & Drainage, Water Storage, Roofing & Timber, Machinery)
+- **Takoradi Logistics Hub** (Heavy Equipment, Cargo Handling, Power Tools, Fasteners)
+
+### Seeding Any Remote / Hosted Backend via API
+
+To seed a live hosted backend (e.g. on Railway or Render):
+```powershell
+.\seed-remote-api.ps1 -BaseUrl "https://stockpulse-backend-production-4c30.up.railway.app" -Username "admin" -Password "Admin@1234"
+```
+This authenticates via JWT and provisions all branch accounts and products over the official REST endpoints.
 
 ## Deploying Frontend on Render
 

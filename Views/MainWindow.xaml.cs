@@ -21,28 +21,92 @@ public partial class MainWindow : Window
         _inventory = inventory;
         InitializeComponent();
 
-        UserText.Text = $"{user.FullName} ({user.RoleName})";
+        UserText.Text = $"{user.FullName} ({user.RoleName}) • Branch: {user.AssignedBranch}";
+        Title = $"StockPulse - {user.AssignedBranch} [{user.RoleName}: {user.FullName}]";
 
-        // Clerks only search and move stock, so the product record buttons are hidden for them.
-        var manageVisibility = user.CanManageProducts ? Visibility.Visible : Visibility.Collapsed;
-        AddButton.Visibility = manageVisibility;
-        EditButton.Visibility = manageVisibility;
-        DeleteButton.Visibility = manageVisibility;
+        var manageProductsVis = user.CanManageProducts ? Visibility.Visible : Visibility.Collapsed;
+        AddButton.Visibility = manageProductsVis;
+        EditButton.Visibility = manageProductsVis;
+        DeleteButton.Visibility = manageProductsVis;
+
+        var manageUsersVis = user.CanManageUsers ? Visibility.Visible : Visibility.Collapsed;
+        ManageUsersButton.Visibility = manageUsersVis;
+        UsersMenuItem.Visibility = manageUsersVis;
 
         _ready = true;
         RefreshList();
     }
 
+    private bool _updatingFilters;
     private ProductRow? SelectedRow => ProductGrid.SelectedItem as ProductRow;
+
+    private void PopulateFilters(IReadOnlyList<Product> all)
+    {
+        _updatingFilters = true;
+        try
+        {
+            var currentBranch = BranchFilterBox.SelectedItem as string ?? "All Branches";
+            var branchSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var b in _inventory.GetBranches())
+            {
+                if (!string.IsNullOrWhiteSpace(b)) branchSet.Add(b.Trim());
+            }
+            foreach (var p in all)
+            {
+                if (!string.IsNullOrWhiteSpace(p.Branch)) branchSet.Add(p.Branch.Trim());
+            }
+
+            var branches = new List<string> { "All Branches" };
+            branches.AddRange(branchSet.OrderBy(b => b));
+            BranchFilterBox.ItemsSource = branches;
+            BranchFilterBox.SelectedItem = branches.Contains(currentBranch) ? currentBranch : "All Branches";
+
+            var currentCategory = CategoryFilterBox.SelectedItem as string ?? "All Categories";
+            var categorySet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in _inventory.GetCategories())
+            {
+                if (!string.IsNullOrWhiteSpace(c)) categorySet.Add(c.Trim());
+            }
+            foreach (var p in all)
+            {
+                if (!string.IsNullOrWhiteSpace(p.Category)) categorySet.Add(p.Category.Trim());
+            }
+
+            var categories = new List<string> { "All Categories" };
+            categories.AddRange(categorySet.OrderBy(c => c));
+            CategoryFilterBox.ItemsSource = categories;
+            CategoryFilterBox.SelectedItem = categories.Contains(currentCategory) ? currentCategory : "All Categories";
+        }
+        finally
+        {
+            _updatingFilters = false;
+        }
+    }
 
     // Reloads the grid from the service, keeping the same product selected if it is still there.
     private void RefreshList(string? selectId = null)
     {
-        if (!_ready) return;
+        if (!_ready || _updatingFilters) return;
         string? keep = selectId ?? SelectedRow?.Id;
 
         var all = _inventory.GetAllProducts();
+        PopulateFilters(all);
+
+        var selectedBranch = BranchFilterBox.SelectedItem as string ?? "All Branches";
+        var selectedCategory = CategoryFilterBox.SelectedItem as string ?? "All Categories";
+
         var found = _inventory.SearchProducts(SearchBox.Text);
+
+        if (selectedBranch != "All Branches")
+        {
+            found = found.Where(p => string.Equals(p.Branch, selectedBranch, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        if (selectedCategory != "All Categories")
+        {
+            found = found.Where(p => string.Equals(p.Category, selectedCategory, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
         if (LowOnlyBox.IsChecked == true)
             found = found.Where(p => p.IsLowStock).ToList();
 
@@ -93,12 +157,21 @@ public partial class MainWindow : Window
         if (e.Key == Key.Delete && _user.CanManageProducts && SelectedRow != null) Delete_Click(sender, e);
     }
 
+    // ----- user accounts (manager) -----
+
+    private void ManageUsers_Click(object sender, RoutedEventArgs e)
+    {
+        var usersWindow = new UsersWindow(_user, _auth, _inventory) { Owner = this };
+        usersWindow.ShowDialog();
+    }
+
     // ----- product records (manager) -----
 
     private void Add_Click(object sender, RoutedEventArgs e)
     {
-        var categories = _inventory.GetAllProducts().Select(p => p.Category).Distinct().OrderBy(c => c);
-        var dialog = new ProductDialog(_inventory.GetNextProductId(), null, categories) { Owner = this };
+        var branches = _inventory.GetBranches();
+        var categories = _inventory.GetCategories();
+        var dialog = new ProductDialog(_inventory.GetNextProductId(), null, categories, branches) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Result == null) return;
 
         Run(() => _inventory.AddProduct(dialog.Result), dialog.Result.Id);
@@ -107,8 +180,9 @@ public partial class MainWindow : Window
     private void Edit_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedRow == null) return;
-        var categories = _inventory.GetAllProducts().Select(p => p.Category).Distinct().OrderBy(c => c);
-        var dialog = new ProductDialog(SelectedRow.Id, SelectedRow.Product, categories) { Owner = this };
+        var branches = _inventory.GetBranches();
+        var categories = _inventory.GetCategories();
+        var dialog = new ProductDialog(SelectedRow.Id, SelectedRow.Product, categories, branches) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Result == null) return;
 
         Run(() => _inventory.UpdateProduct(dialog.Result), dialog.Result.Id);

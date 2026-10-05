@@ -90,13 +90,104 @@ public class StockPulseApiClient
 
         SetToken(loginResponse.Token);
 
-        var isManager = string.Equals(loginResponse.Role, "Warehouse Manager", StringComparison.OrdinalIgnoreCase);
+        var role = loginResponse.Role ?? "";
+        UserRole userRole;
+        if (string.Equals(role, "Administrator", StringComparison.OrdinalIgnoreCase))
+            userRole = UserRole.Administrator;
+        else if (string.Equals(role, "Warehouse Manager", StringComparison.OrdinalIgnoreCase))
+            userRole = UserRole.Manager;
+        else
+            userRole = UserRole.Clerk;
+
+        var fullName = !string.IsNullOrWhiteSpace(loginResponse.FullName) ? loginResponse.FullName : loginResponse.Username;
+        var assignedBranch = !string.IsNullOrWhiteSpace(loginResponse.AssignedBranch) ? loginResponse.AssignedBranch : "All Branches";
+
         return new User
         {
             Username = loginResponse.Username,
-            FullName = loginResponse.Username,
-            Role = isManager ? UserRole.Manager : UserRole.Clerk
+            FullName = fullName,
+            AssignedBranch = assignedBranch,
+            Role = userRole
         };
+    }
+
+    public async Task<IReadOnlyList<UserInfo>> GetUsersAsync()
+    {
+        EnsureAuthenticated();
+
+        using var response = await _http.GetAsync("/api/auth/users").ConfigureAwait(false);
+        await EnsureSuccessAsync(response).ConfigureAwait(false);
+
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        var users = JsonSerializer.Deserialize<List<UserInfo>>(json, JsonOptions) ?? new();
+        return users.OrderBy(u => u.Username).ToList();
+    }
+
+    public async Task RegisterUserAsync(
+        string username,
+        string password,
+        string role,
+        string? fullName = null,
+        string? assignedBranch = null)
+    {
+        EnsureAuthenticated();
+
+        var payload = JsonSerializer.Serialize(new
+        {
+            username = username.Trim(),
+            password = password,
+            role = role.Trim(),
+            fullName = fullName?.Trim() ?? string.Empty,
+            assignedBranch = string.IsNullOrWhiteSpace(assignedBranch) ? "All Branches" : assignedBranch.Trim()
+        });
+
+        using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+        using var response = await _http.PostAsync("/api/auth/users", content).ConfigureAwait(false);
+        await EnsureSuccessAsync(response).ConfigureAwait(false);
+    }
+
+    public async Task UpdateUserAsync(
+        string username,
+        string? fullName,
+        string? role,
+        string? assignedBranch,
+        bool? isActive)
+    {
+        EnsureAuthenticated();
+
+        var payload = JsonSerializer.Serialize(new
+        {
+            fullName,
+            role,
+            assignedBranch,
+            isActive
+        });
+
+        using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+        using var response = await _http.PutAsync($"/api/auth/users/{Uri.EscapeDataString(username.Trim())}", content).ConfigureAwait(false);
+        await EnsureSuccessAsync(response).ConfigureAwait(false);
+    }
+
+    public async Task ResetPasswordAsync(string username, string newPassword)
+    {
+        EnsureAuthenticated();
+
+        var payload = JsonSerializer.Serialize(new
+        {
+            newPassword = newPassword
+        });
+
+        using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+        using var response = await _http.PostAsync($"/api/auth/users/{Uri.EscapeDataString(username.Trim())}/reset-password", content).ConfigureAwait(false);
+        await EnsureSuccessAsync(response).ConfigureAwait(false);
+    }
+
+    public async Task DeleteUserAsync(string username)
+    {
+        EnsureAuthenticated();
+
+        using var response = await _http.DeleteAsync($"/api/auth/users/{Uri.EscapeDataString(username.Trim())}").ConfigureAwait(false);
+        await EnsureSuccessAsync(response).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<Product>> GetAllProductsAsync()
@@ -161,14 +252,67 @@ public class StockPulseApiClient
         }
     }
 
+    public async Task<IReadOnlyList<string>> GetBranchesAsync()
+    {
+        EnsureAuthenticated();
+        try
+        {
+            using var response = await _http.GetAsync("/api/products/branches").ConfigureAwait(false);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                var list = JsonSerializer.Deserialize<List<string>>(json, JsonOptions);
+                if (list != null && list.Count > 0)
+                    return list;
+            }
+        }
+        catch
+        {
+            // fallback to product scan
+        }
+
+        var all = await GetAllProductsAsync().ConfigureAwait(false);
+        return all.Select(p => p.Branch).Where(b => !string.IsNullOrWhiteSpace(b)).Distinct().OrderBy(b => b).ToList();
+    }
+
+    public async Task<IReadOnlyList<string>> GetCategoriesAsync()
+    {
+        EnsureAuthenticated();
+        try
+        {
+            using var response = await _http.GetAsync("/api/products/categories").ConfigureAwait(false);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                var list = JsonSerializer.Deserialize<List<string>>(json, JsonOptions);
+                if (list != null && list.Count > 0)
+                    return list;
+            }
+        }
+        catch
+        {
+            // fallback to product scan
+        }
+
+        var all = await GetAllProductsAsync().ConfigureAwait(false);
+        return all.Select(p => p.Category).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().OrderBy(c => c).ToList();
+    }
+
     public async Task AddProductAsync(Product product)
     {
         EnsureAuthenticated();
 
+        var branch = product.Branch?.Trim() ?? string.Empty;
+        var cat = product.Category?.Trim() ?? string.Empty;
+        var compositeCategory = !string.IsNullOrWhiteSpace(branch) && !cat.StartsWith(branch, StringComparison.OrdinalIgnoreCase)
+            ? $"{branch} - {cat}"
+            : cat;
+
         var payload = JsonSerializer.Serialize(new
         {
             productName = product.Name,
-            category = product.Category,
+            branch = branch,
+            category = compositeCategory,
             quantity = product.Quantity,
             unitPrice = product.UnitPrice,
             reorderLevel = product.ReorderLevel
@@ -204,10 +348,17 @@ public class StockPulseApiClient
         if (!int.TryParse(product.Id, out int id))
             throw new InventoryException($"Invalid product ID '{product.Id}'.");
 
+        var branch = product.Branch?.Trim() ?? string.Empty;
+        var cat = product.Category?.Trim() ?? string.Empty;
+        var compositeCategory = !string.IsNullOrWhiteSpace(branch) && !cat.StartsWith(branch, StringComparison.OrdinalIgnoreCase)
+            ? $"{branch} - {cat}"
+            : cat;
+
         var payload = JsonSerializer.Serialize(new
         {
             productName = product.Name,
-            category = product.Category,
+            branch = branch,
+            category = compositeCategory,
             unitPrice = product.UnitPrice,
             reorderLevel = product.ReorderLevel
         });
@@ -299,19 +450,38 @@ public class StockPulseApiClient
         return $"Server returned status {(int)response.StatusCode} ({response.ReasonPhrase})";
     }
 
-    private static Product MapToDomainProduct(ApiProductResponse p) => new()
+    private static Product MapToDomainProduct(ApiProductResponse p)
     {
-        Id = p.ProductID.ToString(),
-        Name = p.ProductName,
-        Category = p.Category,
-        Quantity = p.Quantity,
-        UnitPrice = p.UnitPrice,
-        ReorderLevel = p.ReorderLevel
-    };
+        string branch = p.Branch?.Trim() ?? string.Empty;
+        string category = p.Category ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(branch) && category.Contains(" - "))
+        {
+            var parts = category.Split(" - ", 2);
+            branch = parts[0].Trim();
+            category = parts[1].Trim();
+        }
+
+        return new()
+        {
+            Id = p.ProductID.ToString(),
+            Name = p.ProductName,
+            Branch = branch,
+            Category = category,
+            Quantity = p.Quantity,
+            UnitPrice = p.UnitPrice,
+            ReorderLevel = p.ReorderLevel
+        };
+    }
 
     private static int ParseId(string id) => int.TryParse(id, out int n) ? n : 0;
 
-    private sealed record ApiLoginResponse(string Token, string Username, string Role);
+    private sealed record ApiLoginResponse(
+        string Token,
+        string Username,
+        string Role,
+        string? FullName = null,
+        string? AssignedBranch = null);
 
     private sealed record ApiProductResponse(
         int ProductID,
@@ -320,5 +490,6 @@ public class StockPulseApiClient
         int Quantity,
         decimal UnitPrice,
         int ReorderLevel,
-        bool IsLowStock);
+        bool IsLowStock,
+        string? Branch = null);
 }

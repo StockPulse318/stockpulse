@@ -40,6 +40,12 @@ public class InventoryService : IInventoryService
     public void StockOut(string productId, int quantity) =>
         RunSync(() => _client.StockOutAsync(productId, quantity));
 
+    public IReadOnlyList<string> GetBranches() =>
+        RunSync(() => _client.GetBranchesAsync());
+
+    public IReadOnlyList<string> GetCategories() =>
+        RunSync(() => _client.GetCategoriesAsync());
+
     private static T RunSync<T>(Func<Task<T>> func)
     {
         try

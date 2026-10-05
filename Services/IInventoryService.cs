@@ -22,4 +22,7 @@ public interface IInventoryService
     void DeleteProduct(string productId);
     void StockIn(string productId, int quantity);
     void StockOut(string productId, int quantity);   // must refuse if it would go below zero
+
+    IReadOnlyList<string> GetBranches();
+    IReadOnlyList<string> GetCategories();
 }
