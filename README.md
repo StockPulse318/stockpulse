@@ -45,7 +45,17 @@ All protected backend endpoints require a JWT Bearer token:
 
 ---
 
-## How to Run
+## Deploying Frontend on Render
+
+This repository includes a `Dockerfile` and `nginx.conf` to deploy a live web distribution portal on Render:
+
+1. Create a **New Web Service** on Render and connect this repository.
+2. Select **Docker** as the Runtime.
+3. Render will automatically build the `Dockerfile`, spin up Nginx on port `10000`, and serve the web download page where users and graders can download the pre-configured Windows app.
+
+---
+
+## How to Run Locally
 
 1. Ensure the .NET 8 SDK is installed.
 2. Run from the terminal:
